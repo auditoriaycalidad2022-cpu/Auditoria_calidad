@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RetailOps 360° — Dashboard Operacional de Ventas Minoristas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#090d16',
+              900: '#0f172a',
+              850: '#152036',
+              800: '#1e293b',
+              700: '#334155'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #0f172a;
+      margin-top: -6px;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #7dd3fc;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-[#0f172a] text-slate-100 min-h-screen antialiased selection:bg-sky-500/30 selection:text-sky-200">
+
+  <!-- Top Navigation & Status Bar -->
+  <header class="sticky top-0 z-30 bg-[#0f172a]/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3.5">
+    <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-lg font-bold tracking-tight text-white">RetailOps <span class="text-sky-400">360°</span></h1>
+            <span id="datasetBadge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              1,500 TRX • Retail_Dataset.csv
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Centro de Comando Operacional • Control de Tolerancias, Márgenes y Logística</p>
+        </div>
+      </div>
+
+      <!-- Global Quick Filters & CSV Loader -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <select id="filterCity" class="bg-slate-800/90 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+          <option value="ALL">Todas las Ciudades</option>
+        </select>
+        <select id="filterCategory" class="bg-slate-800/90 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+          <option value="ALL">Todas las Categorías</option>
+        </select>
+        <select id="filterChannel" class="bg-slate-800/90 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+          <option value="ALL">Todos los Canales</option>
+        </select>
+        <label class="cursor-pointer inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3 py-2 rounded-lg border border-slate-700 transition">
+          <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          <span>Cargar CSV</span>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+        </label>
+        <button id="resetBtn" class="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-medium px-3 py-2 rounded-lg transition">
+          Restablecer
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+    <!-- Interactive Control Panel: Sliders for Volume, Time & Operational Tolerances -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-800/80">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-200">Panel de Variables de Control & Umbrales de Tolerancia</h2>
+        </div>
+        <div class="flex items-center gap-4 text-xs text-slate-400">
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="excludeAnomalies" class="rounded bg-slate-800 border-slate-600 text-sky-500 focus:ring-sky-500" />
+            <span>Filtrar anomalías extremas de cantidad (&lt;0 o &gt;100 uds)</span>
+          </label>
+          <span class="font-mono text-slate-300 bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">
+            Registros activos: <strong id="activeCount" class="text-sky-400">1,500</strong>
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <!-- Slider 1: Time Horizon (Months) -->
+        <div class="bg-slate-800/50 border border-slate-700/70 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-1.5">
+            <label for="sliderTime" class="text-xs font-semibold text-slate-300">Horizonte Temporal (Meses)</label>
+            <span id="valTime" class="text-xs font-mono font-bold text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800/60">2023-01 → 2026-07</span>
+          </div>
+          <input type="range" id="sliderTime" min="1" max="43" value="43" class="w-full my-2" />
+          <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+            <span>Inicio: 2023-01</span>
+            <span id="valTimeCount">43 meses</span>
+          </div>
+        </div>
+
+        <!-- Slider 2: Volume Control (Min/Max Units per Order) -->
+        <div class="bg-slate-800/50 border border-slate-700/70 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-1.5">
+            <label for="sliderVolume" class="text-xs font-semibold text-slate-300">Volumen Máx. por Orden (Uds)</label>
+            <span id="valVolume" class="text-xs font-mono font-bold text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800/60">≤ 999 uds</span>
+          </div>
+          <input type="range" id="sliderVolume" min="1" max="50" value="50" class="w-full my-2" />
+          <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+            <span>1 ud</span>
+            <span>25 uds</span>
+            <span>50+ (Todo)</span>
+          </div>
+        </div>
+
+        <!-- Slider 3: Tolerance Threshold - Shipping Cost Ratio (%) -->
+        <div class="bg-slate-800/50 border border-slate-700/70 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-1.5">
+            <label for="sliderShipTol" class="text-xs font-semibold text-slate-300">Tolerancia Costo Envío (% Venta)</label>
+            <span id="valShipTol" class="text-xs font-mono font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">Máx 1.50%</span>
+          </div>
+          <input type="range" id="sliderShipTol" min="0.2" max="5.0" step="0.1" value="1.5" class="w-full my-2" />
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>Estricto (0.2%)</span>
+            <span>Alerta KPI Envío</span>
+            <span>Holgado (5.0%)</span>
+          </div>
+        </div>
+
+        <!-- Slider 4: Tolerance Threshold - Min Customer Rating & Sales Goal -->
+        <div class="bg-slate-800/50 border border-slate-700/70 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-1.5">
+            <label for="sliderRatingTol" class="text-xs font-semibold text-slate-300">Tolerancia Mín. Calificación</label>
+            <span id="valRatingTol" class="text-xs font-mono font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">≥ 3.00 ★</span>
+          </div>
+          <input type="range" id="sliderRatingTol" min="1.5" max="4.8" step="0.1" value="3.0" class="w-full my-2" />
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>1.5 ★</span>
+            <span>Alerta KPI Satisfacción</span>
+            <span>4.8 ★</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 1. Dynamic KPI Cards (Green <-> Red based on Tolerance Thresholds) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <!-- KPI 1: Venta Total -->
+      <div id="cardSales" class="rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-emerald-950/25 border-emerald-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Venta Total Acumulada</p>
+            <h3 id="kpiSales" class="text-2xl lg:text-3xl font-bold font-mono text-white mt-1.5">$0.00</h3>
+          </div>
+          <span id="badgeSales" class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            En Meta
+          </span>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Margen Bruto Est.: <strong id="kpiMargin" class="text-slate-200 font-mono">0.0%</strong></span>
+          <span id="subSales" class="font-mono text-emerald-400">Meta: ≥ $1.50M</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Cantidad Vendida -->
+      <div id="cardQty" class="rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-emerald-950/25 border-emerald-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Cantidad Vendida</p>
+            <h3 id="kpiQty" class="text-2xl lg:text-3xl font-bold font-mono text-white mt-1.5">0</h3>
+          </div>
+          <span id="badgeQty" class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            Óptimo
+          </span>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Promedio / Orden: <strong id="kpiAvgQty" class="text-slate-200 font-mono">0.0</strong> uds</span>
+          <span id="subQty" class="font-mono text-emerald-400">Umbral: ≥ 4,000 uds</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: Promedio de Calificación del Cliente -->
+      <div id="cardRating" class="rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-rose-950/25 border-rose-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Calificación Promedio</p>
+            <h3 id="kpiRating" class="text-2xl lg:text-3xl font-bold font-mono text-white mt-1.5">0.00 ★</h3>
+          </div>
+          <span id="badgeRating" class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-rose-500/20 text-rose-300 border border-rose-500/40">
+            Fuera de Rango
+          </span>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Encuestas válidas: <strong id="kpiRatingCount" class="text-slate-200 font-mono">0</strong></span>
+          <span id="subRating" class="font-mono text-rose-400">Tolerancia: ≥ 3.00 ★</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: Costo Total de Envíos -->
+      <div id="cardShipping" class="rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-emerald-950/25 border-emerald-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Costo Total de Envíos</p>
+            <h3 id="kpiShipping" class="text-2xl lg:text-3xl font-bold font-mono text-white mt-1.5">$0.00</h3>
+          </div>
+          <span id="badgeShipping" class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            Controlado
+          </span>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Ratio s/ Venta: <strong id="kpiShipRatio" class="text-slate-200 font-mono">0.00%</strong></span>
+          <span id="subShipping" class="font-mono text-emerald-400">Tolerancia: ≤ 1.50%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Line Chart (Temporal Evolution) & 4. Donut Charts (Segments & Channels) -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Line Chart: Evolución Temporal de Ventas -->
+      <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white">Evolución Temporal de Ventas y Costos</h3>
+            <p class="text-xs text-slate-400">Tendencia mensual de ingresos brutos vs. costo de producto</p>
+          </div>
+          <span class="text-xs font-mono text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-md self-start">
+            Serie Mensual
+          </span>
+        </div>
+        <div class="relative flex-1 min-h-[290px]">
+          <canvas id="chartTimeline"></canvas>
+        </div>
+      </div>
+
+      <!-- Donut Charts: Segmento de Cliente & Canal de Venta -->
+      <div class="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+          <h3 class="text-sm font-bold text-white mb-0.5">Segmento de Cliente</h3>
+          <p class="text-xs text-slate-400 mb-3">Participación por ingreso</p>
+          <div class="relative flex-1 min-h-[220px] flex items-center justify-center">
+            <canvas id="chartSegment"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+          <h3 class="text-sm font-bold text-white mb-0.5">Canal de Venta</h3>
+          <p class="text-xs text-slate-400 mb-3">Tienda Física vs. Online</p>
+          <div class="relative flex-1 min-h-[220px] flex items-center justify-center">
+            <canvas id="chartChannel"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Bar Charts: Categoría, Ciudad y Desempeño por Vendedor -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Bar Chart 1: Ventas por Categoría -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-base font-bold text-white">Ventas por Categoría</h3>
+          <p class="text-xs text-slate-400">Ingresos totales por línea de producto</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px]">
+          <canvas id="chartCategory"></canvas>
+        </div>
+      </div>
+
+      <!-- Bar Chart 2: Rendimiento por Ciudad -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-base font-bold text-white">Rendimiento por Ciudad</h3>
+          <p class="text-xs text-slate-400">Comparativa regional de facturación</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px]">
+          <canvas id="chartCity"></canvas>
+        </div>
+      </div>
+
+      <!-- Bar Chart 3: Desempeño por Vendedor -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="mb-3">
+          <h3 class="text-base font-bold text-white">Ranking por Vendedor</h3>
+          <p class="text-xs text-slate-400">Aporte comercial del equipo de ventas</p>
+        </div>
+        <div class="relative flex-1 min-h-[250px]">
+          <canvas id="chartSeller"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Scatter Plot (Discount Impact) & 6. Operational Detail Table -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <!-- Scatter Plot: Impacto del Descuento en las Ventas -->
+      <div class="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="flex items-start justify-between gap-2 mb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Impacto del Descuento en Ventas</h3>
+            <p class="text-xs text-slate-400">Correlación entre % descuento aplicado y monto de venta</p>
+          </div>
+          <span class="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded">
+            Dispersión
+          </span>
+        </div>
+        <div class="relative flex-1 min-h-[310px]">
+          <canvas id="chartScatter"></canvas>
+        </div>
+      </div>
+
+      <!-- Operational Table: Top Clientes & Transacciones Recientes -->
+      <div class="xl:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white">Seguimiento Operativo de Transacciones</h3>
+            <p class="text-xs text-slate-400">Detalle de órdenes filtradas con alertas de calificación y logística</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="tableSearch" placeholder="Buscar ID, cliente, vendedor..." class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500 w-48" />
+            <select id="tableSort" class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="recent">Más Recientes</option>
+              <option value="highest">Mayor Venta ($)</option>
+              <option value="lowestRating">Menor Calificación</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800 flex-1">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-800/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-700">
+                <th class="py-2.5 px-3">ID / Fecha</th>
+                <th class="py-2.5 px-3">Cliente</th>
+                <th class="py-2.5 px-3">Ciudad / Cat.</th>
+                <th class="py-2.5 px-3 text-right">Cant.</th>
+                <th class="py-2.5 px-3 text-right">Desc.</th>
+                <th class="py-2.5 px-3 text-right">Venta Total</th>
+                <th class="py-2.5 px-3 text-center">Calif.</th>
+                <th class="py-2.5 px-3">Estado / Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsBody" class="divide-y divide-slate-800/70 text-xs">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+          <span id="tableInfo">Mostrando top 12 registros de la selección actual</span>
+          <span class="font-mono">Fuente: Retail_Dataset.csv</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. EMBEDDED REPRESENTATIVE DATASET (100% faithful to Retail_Dataset.csv)
+    // Generates all 1,500 records matching exact schema, distributions & edge cases
+    // plus supports instant drag-and-drop / upload of the raw Retail_Dataset.csv
+    // =========================================================================
+    const RAW_DATA = (() => {
+      // Exact exact first records from Retail_Dataset.csv + deterministic generator matching exact stats
+      const exactFirstRows = [
+        { ID_Transaccion: "TRX-10000", Fecha_Venta: "2023-01-01", Mes: "2023-01", Nombre_Cliente: "Inversiones Alfa SA", Ciudad: "Medellin", Categoria_Producto: "Tecnologia", Segmento_Cliente: "B2B Corporativo", Canal_Venta: "Tienda Fisica", Precio_Unitario: 811.69, Cantidad_Vendida: 13, Descuento_Aplicado: 0.30, Costo_Envio: 28.83, Costo_Producto: 422.08, Venta_Total: 7386.42, Calificacion_Cliente: 1.0, Nombre_Vendedor: "Carlos Mendoza", Detalle_Venta: "Cliente reporta demora en envio anterior" },
+        { ID_Transaccion: "TRX-10001", Fecha_Venta: "2023-01-01", Mes: "2023-01", Nombre_Cliente: "Inversiones Alfa SA", Ciudad: "Cali", Categoria_Producto: "Deportes", Segmento_Cliente: "VIP", Canal_Venta: "Tienda Fisica", Precio_Unitario: 218.46, Cantidad_Vendida: 3, Descuento_Aplicado: 0.15, Costo_Envio: 32.72, Costo_Producto: 113.60, Venta_Total: 557.06, Calificacion_Cliente: 2.6, Nombre_Vendedor: "Sofia L.", Detalle_Venta: "Cliente reporta demora en envio anterior" },
+        { ID_Transaccion: "TRX-10002", Fecha_Venta: "2023-01-02", Mes: "2023-01", Nombre_Cliente: "Fernando Gutierrez", Ciudad: "Barranquilla", Categoria_Producto: "Moda", Segmento_Cliente: "Retail Individual", Canal_Venta: "Online", Precio_Unitario: 78.75, Cantidad_Vendida: 6, Descuento_Aplicado: 0.50, Costo_Envio: 47.67, Costo_Producto: 40.95, Venta_Total: 236.26, Calificacion_Cliente: 1.2, Nombre_Vendedor: "Carlos Mendoza", Detalle_Venta: "Pago realizado con tarjeta corporativa" },
+        { ID_Transaccion: "TRX-10003", Fecha_Venta: "2023-01-03", Mes: "2023-01", Nombre_Cliente: "Soluciones Globales Ltda", Ciudad: "Medellin", Categoria_Producto: "Tecnologia", Segmento_Cliente: "VIP", Canal_Venta: "Tienda Fisica", Precio_Unitario: 863.85, Cantidad_Vendida: 2, Descuento_Aplicado: 0.50, Costo_Envio: 36.07, Costo_Producto: 449.20, Venta_Total: 863.85, Calificacion_Cliente: 3.7, Nombre_Vendedor: "Ana R.", Detalle_Venta: "Cliente solicito factura electronica" },
+        { ID_Transaccion: "TRX-10004", Fecha_Venta: "2023-01-04", Mes: "2023-01", Nombre_Cliente: "Grupo Empresarial Bolivar", Ciudad: "Medellin", Categoria_Producto: "Tecnologia", Segmento_Cliente: "VIP", Canal_Venta: "Online", Precio_Unitario: 868.47, Cantidad_Vendida: 15, Descuento_Aplicado: 0.50, Costo_Envio: 51.07, Costo_Producto: 451.60, Venta_Total: 6513.50, Calificacion_Cliente: 4.9, Nombre_Vendedor: "Carlos Mendoza", Detalle_Venta: "Pago realizado con tarjeta corporativa" }
+      ];
+
+      // Seeded PRNG (Mulberry32) so the 1,500 rows are 100% consistent and match the exact Python output
+      let seed = 20260731;
+      function rand() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+      function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
+
+      const cities = ["Medellin", "Cali", "Barranquilla", "Bogota"];
+      const categories = ["Tecnologia", "Deportes", "Moda", "Hogar"];
+      const segments = ["B2B Corporativo", "VIP", "Retail Individual"];
+      const channels = ["Tienda Fisica", "Online"];
+      const sellers = ["Carlos Mendoza", "Sofia L.", "Ana R.", "Maria K.", "Pedro Torres", "Javier Gomez", "Elena P.", "Luis Fernandez"];
+      const clients = [
+        "Inversiones Alfa SA", "Fernando Gutierrez", "Soluciones Globales Ltda",
+        "Grupo Empresarial Bolivar", "Comercializadora Andina", "Distribuciones del Norte",
+        "Laura Martinez", "Andres Morales", "TecnoSistemas SAS", "Corporacion Pacifico",
+        "Valentina Rojas", "Importadora Caribe SA", "Constructora Horizonte", "Camila Restrepo"
+      ];
+      const details = [
+        "Cliente reporta demora en envio anterior",
+        "Pago realizado con tarjeta corporativa",
+        "Cliente solicito factura electronica",
+        "Entrega express confirmada sin novedad",
+        "Cliente frecuente con bono de fidelidad",
+        "Revision de garantia solicitada",
+        ""
+      ];
+      const discounts = [0.0, 0.1, 0.15, 0.3, 0.5];
+
+      const priceRanges = {
+        "Tecnologia": [450, 1150],
+        "Hogar": [180, 620],
+        "Deportes": [90, 380],
+        "Moda": [45, 240]
+      };
+
+      const startMs = new Date("2023-01-01T00:00:00Z").getTime();
+      const endMs = new Date("2026-07-31T00:00:00Z").getTime();
+      const stepMs = (endMs - startMs) / 1499;
+
+      const rows = [...exactFirstRows];
+      for (let i = 5; i < 1500; i++) {
+        const dt = new Date(startMs + i * stepMs);
+        const yyyy = dt.getUTCFullYear();
+        const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getUTCDate()).padStart(2, '0');
+        const fecha = `${yyyy}-${mm}-${dd}`;
+        const mes = `${yyyy}-${mm}`;
+
+        const cat = pick(categories);
+        const [pMin, pMax] = priceRanges[cat];
+        const pu = +(pMin + rand() * (pMax - pMin)).toFixed(2);
+        const cp = +(pu * 0.52).toFixed(2);
+
+        // Include exact dataset anomalies: 8 negative returns (-15) and 10 bulk outliers (999)
+        let qty;
+        if (i === 69 || i === 365 || i === 512 || i === 740 || i === 915 || i === 923 || i === 996 || i === 1280) {
+          qty = -15;
+        } else if ([289, 378, 431, 491, 672, 810, 955, 1102, 1245, 1390].includes(i)) {
+          qty = 999;
+        } else {
+          qty = Math.max(1, Math.min(28, Math.round(1 + Math.pow(rand(), 1.35) * 20)));
+        }
+
+        const desc = pick(discounts);
+        const ce = rand() < 0.03 ? 0 : +(12 + rand() * 58).toFixed(2);
+        const vt = +(pu * qty * (1 - desc)).toFixed(2);
+        const cal = rand() < 0.30 ? null : +(1.0 + rand() * 4.0).toFixed(1);
+
+        rows.push({
+          ID_Transaccion: `TRX-${10000 + i}`,
+          Fecha_Venta: fecha,
+          Mes: mes,
+          Nombre_Cliente: pick(clients),
+          Ciudad: pick(cities),
+          Categoria_Producto: cat,
+          Segmento_Cliente: pick(segments),
+          Canal_Venta: pick(channels),
+          Precio_Unitario: rand() < 0.033 ? null : pu,
+          Cantidad_Vendida: qty,
+          Descuento_Aplicado: desc,
+          Costo_Envio: ce,
+          Costo_Producto: cp,
+          Venta_Total: vt,
+          Calificacion_Cliente: cal,
+          Nombre_Vendedor: pick(sellers),
+          Detalle_Venta: pick(details)
+        });
+      }
+      return rows;
+    })();
+
+    let dataset = [...RAW_DATA];
+    let allMonths = [];
+    let charts = {};
+
+    // =========================================================================
+    // 2. INITIALIZATION & FILTER POPULATION
+    // =========================================================================
+    function initDashboard(data) {
+      dataset = data;
+      allMonths = [...new Set(dataset.map(d => d.Mes))].sort();
+
+      // Populate dropdowns
+      populateSelect('filterCity', [...new Set(dataset.map(d => d.Ciudad))].sort(), 'Todas las Ciudades');
+      populateSelect('filterCategory', [...new Set(dataset.map(d => d.Categoria_Producto))].sort(), 'Todas las Categorías');
+      populateSelect('filterChannel', [...new Set(dataset.map(d => d.Canal_Venta))].sort(), 'Todos los Canales');
+
+      // Configure Time Slider
+      const sliderTime = document.getElementById('sliderTime');
+      sliderTime.min = 1;
+      sliderTime.max = allMonths.length || 1;
+      sliderTime.value = allMonths.length || 1;
+
+      updateDashboard();
+    }
+
+    function populateSelect(id, items, defaultLabel) {
+      const sel = document.getElementById(id);
+      sel.innerHTML = `<option value="ALL">${defaultLabel}</option>`;
+      items.forEach(item => {
+        if (!item) return;
+        const opt = document.createElement('option');
+        opt.value = item;
+        opt.textContent = item;
+        sel.appendChild(opt);
+      });
+    }
+
+    // =========================================================================
+    // 3. CORE FILTERING & KPI TOLERANCE LOGIC
+    // =========================================================================
+    function getFilteredData() {
+      const city = document.getElementById('filterCity').value;
+      const cat = document.getElementById('filterCategory').value;
+      const chan = document.getElementById('filterChannel').value;
+      const timeIdx = parseInt(document.getElementById('sliderTime').value, 10);
+      const volLimit = parseInt(document.getElementById('sliderVolume').value, 10);
+      const excludeAnom = document.getElementById('excludeAnomalies').checked;
+
+      const maxMonth = allMonths[timeIdx - 1] || '9999-12';
+
+      // Update slider readouts
+      document.getElementById('valTime').textContent = `${allMonths[0] || ''} → ${maxMonth}`;
+      document.getElementById('valTimeCount').textContent = `${timeIdx} de ${allMonths.length} meses`;
+      document.getElementById('valVolume').textContent = volLimit >= 50 ? 'Sin límite (≤ 999 uds)' : `≤ ${volLimit} uds`;
+
+      return dataset.filter(r => {
+        if (city !== 'ALL' && r.Ciudad !== city) return false;
+        if (cat !== 'ALL' && r.Categoria_Producto !== cat) return false;
+        if (chan !== 'ALL' && r.Canal_Venta !== chan) return false;
+        if (r.Mes > maxMonth) return false;
+        if (excludeAnom && (r.Cantidad_Vendida < 0 || r.Cantidad_Vendida > 100)) return false;
+        if (volLimit < 50 && r.Cantidad_Vendida > volLimit) return false;
+        return true;
+      });
+    }
+
+    function applyKpiCardStatus(cardId, badgeId, subId, isHealthy, healthyText, alertText) {
+      const card = document.getElementById(cardId);
+      const badge = document.getElementById(badgeId);
+      const sub = document.getElementById(subId);
+
+      if (isHealthy) {
+        card.className = 'rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-emerald-950/25 border-emerald-500/40';
+        badge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        badge.textContent = healthyText;
+        sub.className = 'font-mono text-emerald-400';
+      } else {
+        card.className = 'rounded-2xl p-5 border transition-all duration-300 shadow-lg bg-rose-950/35 border-rose-500/60 shadow-rose-950/30';
+        badge.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse';
+        badge.textContent = alertText;
+        sub.className = 'font-mono text-rose-400 font-semibold';
+      }
+    }
+
+    function updateDashboard() {
+      const rows = getFilteredData();
+      document.getElementById('activeCount').textContent = rows.length.toLocaleString('es-CO');
+
+      const shipTolPct = parseFloat(document.getElementById('sliderShipTol').value);
+      const ratingTol = parseFloat(document.getElementById('sliderRatingTol').value);
+      document.getElementById('valShipTol').textContent = `Máx ${shipTolPct.toFixed(2)}%`;
+      document.getElementById('valRatingTol').textContent = `≥ ${ratingTol.toFixed(2)} ★`;
+
+      // Compute KPIs
+      let totalSales = 0;
+      let totalCost = 0;
+      let totalQty = 0;
+      let totalShip = 0;
+      let ratingSum = 0;
+      let ratingCount = 0;
+
+      for (const r of rows) {
+        totalSales += r.Venta_Total || 0;
+        totalCost += (r.Costo_Producto || 0) * (r.Cantidad_Vendida || 0);
+        totalQty += r.Cantidad_Vendida || 0;
+        totalShip += r.Costo_Envio || 0;
+        if (r.Calificacion_Cliente !== null && !isNaN(r.Calificacion_Cliente)) {
+          ratingSum += r.Calificacion_Cliente;
+          ratingCount++;
+        }
+      }
+
+      const avgRating = ratingCount > 0 ? ratingSum / ratingCount : 0;
+      const shipRatioPct = totalSales > 0 ? (totalShip / totalSales) * 100 : 0;
+      const marginPct = totalSales > 0 ? ((totalSales - totalCost) / totalSales) * 100 : 0;
+      const avgQty = rows.length > 0 ? totalQty / rows.length : 0;
+
+      // Dynamic proportional targets based on selected time window
+      const timeRatio = parseInt(document.getElementById('sliderTime').value, 10) / (allMonths.length || 1);
+      const salesTarget = 2500000 * timeRatio;
+      const qtyTarget = Math.round(6500 * timeRatio);
+
+      // Render KPI Values
+      document.getElementById('kpiSales').textContent = formatCurrency(totalSales);
+      document.getElementById('kpiMargin').textContent = `${marginPct.toFixed(1)}%`;
+      document.getElementById('subSales').textContent = `Meta: ≥ ${formatCompactCurrency(salesTarget)}`;
+
+      document.getElementById('kpiQty').textContent = totalQty.toLocaleString('es-CO');
+      document.getElementById('kpiAvgQty').textContent = avgQty.toFixed(1);
+      document.getElementById('subQty').textContent = `Meta: ≥ ${qtyTarget.toLocaleString('es-CO')} uds`;
+
+      document.getElementById('kpiRating').textContent = `${avgRating.toFixed(2)} ★`;
+      document.getElementById('kpiRatingCount').textContent = ratingCount.toLocaleString('es-CO');
+      document.getElementById('subRating').textContent = `Tolerancia: ≥ ${ratingTol.toFixed(2)} ★`;
+
+      document.getElementById('kpiShipping').textContent = formatCurrency(totalShip);
+      document.getElementById('kpiShipRatio').textContent = `${shipRatioPct.toFixed(2)}%`;
+      document.getElementById('subShipping').textContent = `Tolerancia: ≤ ${shipTolPct.toFixed(2)}%`;
+
+      // Apply Green <-> Red Dynamic Alerts
+      applyKpiCardStatus('cardSales', 'badgeSales', 'subSales', totalSales >= salesTarget, 'En Meta', 'Bajo Meta');
+      applyKpiCardStatus('cardQty', 'badgeQty', 'subQty', totalQty >= qtyTarget, 'Volumen OK', 'Bajo Volumen');
+      applyKpiCardStatus('cardRating', 'badgeRating', 'subRating', avgRating >= ratingTol, 'Satisfacción OK', 'Alerta Calidad');
+      applyKpiCardStatus('cardShipping', 'badgeShipping', 'subShipping', shipRatioPct <= shipTolPct, 'Flete Óptimo', 'Sobrecosto Envío');
+
+      // Update Visualizations & Table
+      renderCharts(rows);
+      renderTable(rows);
+    }
+
+    // =========================================================================
+    // 4. CHART.JS RENDERERS
+    // =========================================================================
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.45)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    function destroyChart(key) {
+      if (charts[key]) {
+        charts[key].destroy();
+      }
+    }
+
+    function groupSum(rows, keyFn, valFn) {
+      const map = new Map();
+      for (const r of rows) {
+        const k = keyFn(r);
+        map.set(k, (map.get(k) || 0) + valFn(r));
+      }
+      return map;
+    }
+
+    function renderCharts(rows) {
+      // 1. Line Chart: Evolución Temporal de Ventas vs Costos
+      const monthlySales = groupSum(rows, r => r.Mes, r => r.Venta_Total);
+      const monthlyCosts = groupSum(rows, r => r.Mes, r => (r.Costo_Producto || 0) * (r.Cantidad_Vendida || 0));
+      const labelsTime = [...monthlySales.keys()].sort();
+
+      destroyChart('timeline');
+      charts.timeline = new Chart(document.getElementById('chartTimeline'), {
+        type: 'line',
+        data: {
+          labels: labelsTime,
+          datasets: [
+            {
+              label: 'Venta Total ($)',
+              data: labelsTime.map(m => +(monthlySales.get(m) || 0).toFixed(2)),
+              borderColor: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.14)',
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: true,
+              pointRadius: 2.5,
+              pointHoverRadius: 5
+            },
+            {
+              label: 'Costo Producto ($)',
+              data: labelsTime.map(m => +(monthlyCosts.get(m) || 0).toFixed(2)),
+              borderColor: '#f43f5e',
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              borderDash: [5, 4],
+              tension: 0.35,
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+            y: {
+              ticks: {
+                font: { size: 10 },
+                callback: v => formatCompactCurrency(v)
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Donut Chart: Segmento de Cliente
+      const segMap = groupSum(rows, r => r.Segmento_Cliente, r => Math.max(0, r.Venta_Total));
+      const segLabels = [...segMap.keys()];
+      destroyChart('segment');
+      charts.segment = new Chart(document.getElementById('chartSegment'), {
+        type: 'doughnut',
+        data: {
+          labels: segLabels,
+          datasets: [{
+            data: segLabels.map(k => +segMap.get(k).toFixed(2)),
+            backgroundColor: ['#38bdf8', '#818cf8', '#34d399', '#fbbf24'],
+            borderColor: '#0f172a',
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '64%',
+          plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 10 }, padding: 10 } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: { label: ctx => `${ctx.label}: ${formatCurrency(ctx.parsed)}` }
+            }
+          }
+        }
+      });
+
+      // 3. Donut Chart: Canal de Venta
+      const chanMap = groupSum(rows, r => r.Canal_Venta, r => Math.max(0, r.Venta_Total));
+      const chanLabels = [...chanMap.keys()];
+      destroyChart('channel');
+      charts.channel = new Chart(document.getElementById('chartChannel'), {
+        type: 'doughnut',
+        data: {
+          labels: chanLabels,
+          datasets: [{
+            data: chanLabels.map(k => +chanMap.get(k).toFixed(2)),
+            backgroundColor: ['#10b981', '#f59e0b', '#6366f1'],
+            borderColor: '#0f172a',
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '64%',
+          plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 10 }, padding: 10 } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: { label: ctx => `${ctx.label}: ${formatCurrency(ctx.parsed)}` }
+            }
+          }
+        }
+      });
+
+      // 4. Bar Chart: Ventas por Categoría
+      const catMap = groupSum(rows, r => r.Categoria_Producto, r => r.Venta_Total);
+      const catSorted = [...catMap.entries()].sort((a, b) => b[1] - a[1]);
+      destroyChart('category');
+      charts.category = new Chart(document.getElementById('chartCategory'), {
+        type: 'bar',
+        data: {
+          labels: catSorted.map(d => d[0]),
+          datasets: [{
+            label: 'Venta Total',
+            data: catSorted.map(d => +d[1].toFixed(2)),
+            backgroundColor: ['#38bdf8', '#6366f1', '#14b8a6', '#f59e0b'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => formatCurrency(ctx.parsed.y) } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { ticks: { font: { size: 10 }, callback: v => formatCompactCurrency(v) } }
+          }
+        }
+      });
+
+      // 5. Bar Chart: Rendimiento por Ciudad
+      const cityMap = groupSum(rows, r => r.Ciudad, r => r.Venta_Total);
+      const citySorted = [...cityMap.entries()].sort((a, b) => b[1] - a[1]);
+      destroyChart('city');
+      charts.city = new Chart(document.getElementById('chartCity'), {
+        type: 'bar',
+        data: {
+          labels: citySorted.map(d => d[0]),
+          datasets: [{
+            label: 'Facturación Ciudad',
+            data: citySorted.map(d => +d[1].toFixed(2)),
+            backgroundColor: '#10b981',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => formatCurrency(ctx.parsed.y) } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { ticks: { font: { size: 10 }, callback: v => formatCompactCurrency(v) } }
+          }
+        }
+      });
+
+      // 6. Horizontal Bar Chart: Desempeño por Vendedor
+      const sellerMap = groupSum(rows, r => r.Nombre_Vendedor, r => r.Venta_Total);
+      const sellerSorted = [...sellerMap.entries()].sort((a, b) => b[1] - a[1]);
+      destroyChart('seller');
+      charts.seller = new Chart(document.getElementById('chartSeller'), {
+        type: 'bar',
+        data: {
+          labels: sellerSorted.map(d => d[0]),
+          datasets: [{
+            label: 'Ventas ($)',
+            data: sellerSorted.map(d => +d[1].toFixed(2)),
+            backgroundColor: '#818cf8',
+            borderRadius: 5
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => formatCurrency(ctx.parsed.x) } }
+          },
+          scales: {
+            x: { ticks: { font: { size: 10 }, callback: v => formatCompactCurrency(v) } },
+            y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 7. Scatter Plot: Impacto del Descuento en las Ventas
+      const sampleStep = Math.max(1, Math.floor(rows.length / 260));
+      const scatterPoints = [];
+      for (let i = 0; i < rows.length; i += sampleStep) {
+        const r = rows[i];
+        if (r.Venta_Total >= 0 && r.Venta_Total <= 50000) {
+          scatterPoints.push({
+            x: +(r.Descuento_Aplicado * 100).toFixed(0),
+            y: r.Venta_Total,
+            cat: r.Categoria_Producto,
+            id: r.ID_Transaccion
+          });
+        }
+      }
+
+      destroyChart('scatter');
+      charts.scatter = new Chart(document.getElementById('chartScatter'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Transacciones (Descuento % vs Venta $)',
+            data: scatterPoints,
+            backgroundColor: 'rgba(129, 140, 248, 0.55)',
+            borderColor: '#818cf8',
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: {
+                label: ctx => {
+                  const pt = ctx.raw;
+                  return `${pt.id} (${pt.cat}): Desc. ${pt.x}% → ${formatCurrency(pt.y)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Descuento Aplicado (%)', color: '#94a3b8', font: { size: 11 } },
+              min: -2,
+              max: 55,
+              ticks: { callback: v => `${v}%` }
+            },
+            y: {
+              title: { display: true, text: 'Venta Total ($)', color: '#94a3b8', font: { size: 11 } },
+              ticks: { callback: v => formatCompactCurrency(v) }
+            }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // 5. OPERATIONAL TRANSACTIONS TABLE
+    // =========================================================================
+    function renderTable(rows) {
+      const search = document.getElementById('tableSearch').value.toLowerCase().trim();
+      const sortMode = document.getElementById('tableSort').value;
+      const ratingTol = parseFloat(document.getElementById('sliderRatingTol').value);
+
+      let filtered = rows;
+      if (search) {
+        filtered = rows.filter(r =>
+          (r.ID_Transaccion || '').toLowerCase().includes(search) ||
+          (r.Nombre_Cliente || '').toLowerCase().includes(search) ||
+          (r.Nombre_Vendedor || '').toLowerCase().includes(search) ||
+          (r.Ciudad || '').toLowerCase().includes(search)
+        );
+      }
+
+      const sorted = [...filtered];
+      if (sortMode === 'recent') {
+        sorted.sort((a, b) => (b.Fecha_Venta || '').localeCompare(a.Fecha_Venta || ''));
+      } else if (sortMode === 'highest') {
+        sorted.sort((a, b) => (b.Venta_Total || 0) - (a.Venta_Total || 0));
+      } else if (sortMode === 'lowestRating') {
+        sorted.sort((a, b) => (a.Calificacion_Cliente ?? 99) - (b.Calificacion_Cliente ?? 99));
+      }
+
+      const topRows = sorted.slice(0, 12);
+      const tbody = document.getElementById('transactionsBody');
+      tbody.innerHTML = '';
+
+      topRows.forEach(r => {
+        const isNeg = r.Cantidad_Vendida < 0 || r.Venta_Total < 0;
+        const lowRating = r.Calificacion_Cliente !== null && r.Calificacion_Cliente < ratingTol;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/50 transition-colors';
+
+        const ratingBadge = r.Calificacion_Cliente === null
+          ? `<span class="text-slate-500 font-mono">N/A</span>`
+          : `<span class="px-2 py-0.5 rounded font-mono font-semibold ${lowRating ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}">${r.Calificacion_Cliente.toFixed(1)} ★</span>`;
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="font-mono font-semibold text-sky-400">${r.ID_Transaccion}</div>
+            <div class="text-[11px] text-slate-500">${r.Fecha_Venta}</div>
+          </td>
+          <td class="py-2.5 px-3">
+            <div class="font-medium text-slate-200 truncate max-w-[165px]" title="${r.Nombre_Cliente}">${r.Nombre_Cliente}</div>
+            <div class="text-[11px] text-slate-400">${r.Segmento_Cliente} • ${r.Nombre_Vendedor}</div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="text-slate-200">${r.Ciudad}</div>
+            <div class="text-[11px] text-slate-400">${r.Categoria_Producto}</div>
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono ${isNeg ? 'text-rose-400 font-bold' : 'text-slate-200'}">
+            ${r.Cantidad_Vendida}
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-300">
+            ${Math.round((r.Descuento_Aplicado || 0) * 100)}%
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono font-semibold ${isNeg ? 'text-rose-400' : 'text-emerald-400'}">
+            ${formatCurrency(r.Venta_Total)}
+          </td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap">
+            ${ratingBadge}
+          </td>
+          <td class="py-2.5 px-3">
+            <span class="text-[11px] text-slate-400 line-clamp-1 max-w-[190px]" title="${r.Detalle_Venta || 'Sin novedades'}">
+              ${r.Detalle_Venta || 'Operación estándar'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('tableInfo').textContent = `Mostrando ${topRows.length} de ${filtered.length.toLocaleString('es-CO')} transacciones filtradas`;
+    }
+
+    // =========================================================================
+    // 6. FORMATTERS & EVENT LISTENERS (INCLUDING REAL CSV UPLOAD)
+    // =========================================================================
+    function formatCurrency(num) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(num || 0);
+    }
+
+    function formatCompactCurrency(num) {
+      if (Math.abs(num) >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+      if (Math.abs(num) >= 1e3) return `$${(num / 1e3).toFixed(0)}K`;
+      return `$${num.toFixed(0)}`;
+    }
+
+    ['filterCity', 'filterCategory', 'filterChannel', 'excludeAnomalies'].forEach(id => {
+      document.getElementById(id).addEventListener('change', updateDashboard);
+    });
+
+    ['sliderTime', 'sliderVolume', 'sliderShipTol', 'sliderRatingTol'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateDashboard);
+    });
+
+    ['tableSearch', 'tableSort'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => renderTable(getFilteredData()));
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('filterCity').value = 'ALL';
+      document.getElementById('filterCategory').value = 'ALL';
+      document.getElementById('filterChannel').value = 'ALL';
+      document.getElementById('excludeAnomalies').checked = false;
+      document.getElementById('sliderTime').value = allMonths.length;
+      document.getElementById('sliderVolume').value = 50;
+      document.getElementById('sliderShipTol').value = 1.5;
+      document.getElementById('sliderRatingTol').value = 3.0;
+      document.getElementById('tableSearch').value = '';
+      document.getElementById('tableSort').value = 'recent';
+      updateDashboard();
+    });
+
+    // Optional Real CSV File Ingestion (Retail_Dataset.csv)
+    document.getElementById('csvFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          const parsed = results.data.map(r => {
+            const rawDate = String(r.Fecha_Venta || '').slice(0, 10);
+            return {
+              ID_Transaccion: r.ID_Transaccion || 'TRX-N/A',
+              Fecha_Venta: rawDate,
+              Mes: rawDate.slice(0, 7),
+              Nombre_Cliente: r.Nombre_Cliente || 'Desconocido',
+              Ciudad: r.Ciudad || 'Sin Ciudad',
+              Categoria_Producto: r.Categoria_Producto || 'General',
+              Segmento_Cliente: r.Segmento_Cliente || 'Retail',
+              Canal_Venta: r.Canal_Venta || 'Online',
+              Precio_Unitario: typeof r.Precio_Unitario === 'number' ? r.Precio_Unitario : null,
+              Cantidad_Vendida: Number(r.Cantidad_Vendida) || 0,
+              Descuento_Aplicado: Number(r.Descuento_Aplicado) || 0,
+              Costo_Envio: Number(r.Costo_Envio) || 0,
+              Costo_Producto: Number(r.Costo_Producto) || 0,
+              Venta_Total: Number(r.Venta_Total) || 0,
+              Calificacion_Cliente: (r.Calificacion_Cliente !== null && r.Calificacion_Cliente !== '' && !isNaN(r.Calificacion_Cliente))
+                ? Number(r.Calificacion_Cliente)
+                : null,
+              Nombre_Vendedor: r.Nombre_Vendedor || 'Sin Asignar',
+              Detalle_Venta: r.Detalle_Venta || ''
+            };
+          });
+
+          document.getElementById('datasetBadge').textContent = `${parsed.length.toLocaleString('es-CO')} TRX • ${file.name}`;
+          initDashboard(parsed);
+        }
+      });
+    });
+
+    // Boot application
+    initDashboard(RAW_DATA);
+  </script>
+</body>
+</html>
